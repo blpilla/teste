@@ -70,12 +70,19 @@ class ReservationController extends Controller
             'date' => 'required|date',
         ]);
 
-        if($this->reservationRule($request))
+        if($this->reservationRoomRule($request))
         {
-            $requestData['date'] = $this->minuteFilter($request->date);
-            Reservation::create($requestData);
+            if($this->reservationUserRule($request))
+            {
+                $requestData['date'] = $this->minuteFilter($request->date);
+                Reservation::create($requestData);
 
-            return redirect('reservation')->with('flash_message', 'Reserva realizada!');
+                return redirect('reservation')->with('flash_message', 'Reserva realizada!');
+            }
+            else
+            {
+                return redirect('reservation')->with('fail_message', 'Usuário já possui sala reservada neste horário!');
+            }
         }
         else
         {
@@ -127,13 +134,20 @@ class ReservationController extends Controller
             'date' => 'required|date',
         ]);
 
-        if($this->reservationRule($request, $id))
+        if($this->reservationRoomRule($request, $id))
         {
-            $requestData['date'] = $this->minuteFilter($request->date);
-            $reservation = Reservation::findOrFail($id);
-            $reservation->update($requestData);
+            if($this->reservationUserRule($request, $id))
+            {
+                $requestData['date'] = $this->minuteFilter($request->date);
+                $reservation = Reservation::findOrFail($id);
+                $reservation->update($requestData);
 
-            return redirect('reservation')->with('flash_message', 'Reserva alterada!');
+                return redirect('reservation')->with('flash_message', 'Reserva alterada!');
+            }
+            else
+            {
+                return redirect('reservation')->with('fail_message', 'Usuário já possui sala reservada neste horário!');
+            }
         }
         else
         {
@@ -162,11 +176,21 @@ class ReservationController extends Controller
         return date_format($createDate, 'Y-m-d H:00:00');
     }
 
-    public function reservationRule($request, $id = 0)
+    public function reservationRoomRule($request, $id = 0)
     {
         $date = $this->minuteFilter($request->date);
-        $to = date("Y-m-d H:i:s", strtotime("$date +1 hour + 1 minute"));
+        $to = date("Y-m-d H:i:s", strtotime("$date +1 hour"));
         $test = Reservation::where('room_id', '=', "$request->room_id")
+        ->whereBetween('date', [$date, $to])->where('id', '<>', $id)->get();
+
+        return count($test) == 0;
+    }
+
+    public function reservationUserRule($request, $id = 0)
+    {
+        $date = $this->minuteFilter($request->date);
+        $to = date("Y-m-d H:i:s", strtotime("$date +1 hour"));
+        $test = Reservation::where('user_id', '=', "$request->user_id")
         ->whereBetween('date', [$date, $to])->where('id', '<>', $id)->get();
 
         return count($test) == 0;
